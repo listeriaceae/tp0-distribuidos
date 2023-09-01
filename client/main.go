@@ -29,29 +29,25 @@ func InitConfig() (*viper.Viper, error) {
 	// env variables for the nested configurations
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	// Add env variables supported
-	v.BindEnv("id")
-	v.BindEnv("server", "address")
-	v.BindEnv("loop", "period")
-	v.BindEnv("loop", "lapse")
-	v.BindEnv("log", "level")
-
 	// Try to read configuration from config file. If config file
 	// does not exists then ReadInConfig will fail but configuration
 	// can be loaded from the environment variables so we shouldn't
 	// return an error in that case
-	v.SetConfigFile("./config.yaml")
+	v.SetConfigName("config")
+	v.SetConfigType("yaml")
+	v.AddConfigPath(".")
+	v.AddConfigPath("client")
 	if err := v.ReadInConfig(); err != nil {
-		fmt.Printf("Configuration could not be read from config file. Using env variables instead")
+		fmt.Println("Configuration could not be read from config file. Using env variables instead")
 	}
 
 	// Parse time.Duration variables and return an error if those variables cannot be parsed
 	if _, err := time.ParseDuration(v.GetString("loop.lapse")); err != nil {
-		return nil, errors.Wrapf(err, "Could not parse CLI_LOOP_LAPSE env var as time.Duration.")
+		return nil, errors.Wrap(err, "Could not parse CLI_LOOP_LAPSE env var as time.Duration.")
 	}
 
 	if _, err := time.ParseDuration(v.GetString("loop.period")); err != nil {
-		return nil, errors.Wrapf(err, "Could not parse CLI_LOOP_PERIOD env var as time.Duration.")
+		return nil, errors.Wrap(err, "Could not parse CLI_LOOP_PERIOD env var as time.Duration.")
 	}
 
 	return v, nil
@@ -90,11 +86,11 @@ func PrintConfig(v *viper.Viper) {
 func main() {
 	v, err := InitConfig()
 	if err != nil {
-		log.Fatalf("%s", err)
+		log.Fatal(err)
 	}
 
 	if err := InitLogger(v.GetString("log.level")); err != nil {
-		log.Fatalf("%s", err)
+		log.Fatal(err)
 	}
 
 	// Print program config with debugging purposes
