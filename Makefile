@@ -15,6 +15,11 @@ build: deps
 	GOOS=linux go build -o bin/client github.com/7574-sistemas-distribuidos/docker-compose-init/client
 .PHONY: build
 
+# usage: `make configure NCLIENTS=<N>`
+configure:
+	./configure.sh $(NCLIENTS) > docker-compose-dev.yaml
+.PHONY: configure
+
 docker-image:
 	docker build -f ./server/Dockerfile -t "server:latest" .
 	docker build -f ./client/Dockerfile -t "client:latest" .
