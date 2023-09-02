@@ -29,7 +29,9 @@ services:
       - PYTHONUNBUFFERED=1
       - LOGGING_LEVEL=DEBUG
     networks:
-      - testing_net"
+      - testing_net
+    volumes:
+      - ./server/config.ini:/config.ini"
 
 while [ $n -le $nclients ]
 do
@@ -44,7 +46,10 @@ do
     networks:
       - testing_net
     depends_on:
-      - server\n' $n $n $n
+      - server
+    volumes:
+      - ./client/config.yaml:/config.yaml\n' $n $n $n
+
     n=$((n+1))
 done
 
