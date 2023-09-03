@@ -49,3 +49,11 @@ def load_bets() -> list[Bet]:
         for row in reader:
             yield Bet(row[0], row[1], row[2], row[3], row[4], row[5])
 
+
+class SignalException(Exception):
+    # do nothing
+    pass
+
+
+def handler(signum, frame):
+    raise SignalException()

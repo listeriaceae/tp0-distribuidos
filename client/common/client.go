@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"time"
+	"os"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -48,36 +49,29 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
+func (c *Client) communicateWithServer(msgID int) (string, error) {
+	// Create the connection the server in every loop iteration. Send an
+	c.createClientSocket()
+	defer c.conn.Close()
+
+	// TODO: Modify the send to avoid short-write
+	fmt.Fprintf(
+		c.conn,
+		"[CLIENT %v] Message N°%v\n",
+		c.config.ID,
+		msgID,
+	)
+
+	return bufio.NewReader(c.conn).ReadString('\n')
+}
+
 // StartClientLoop Send messages to the client until some time threshold is met
-func (c *Client) StartClientLoop() {
-	// autoincremental msgID to identify every message sent
-	msgID := 1
-
+func (c *Client) StartClientLoop(sig chan os.Signal) {
 loop:
+	// autoincremental msgID to identify every message sent
 	// Send messages if the loopLapse threshold has not been surpassed
-	for timeout := time.After(c.config.LoopLapse); ; {
-		select {
-		case <-timeout:
-			log.Infof("action: timeout_detected | result: success | client_id: %v",
-				c.config.ID,
-			)
-			break loop
-		default:
-		}
-
-		// Create the connection the server in every loop iteration. Send an
-		c.createClientSocket()
-
-		// TODO: Modify the send to avoid short-write
-		fmt.Fprintf(
-			c.conn,
-			"[CLIENT %v] Message N°%v\n",
-			c.config.ID,
-			msgID,
-		)
-		msg, err := bufio.NewReader(c.conn).ReadString('\n')
-		msgID++
-		c.conn.Close()
+	for msgID, timeout := 1, time.After(c.config.LoopLapse); ; msgID++ {
+		msg, err := c.communicateWithServer(msgID)
 
 		if err != nil {
 			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
@@ -92,7 +86,19 @@ loop:
 		)
 
 		// Wait a time between sending one message and the next one
-		time.Sleep(c.config.LoopPeriod)
+		select {
+		case <-timeout:
+			log.Infof("action: timeout_detected | result: success | client_id: %v",
+				c.config.ID,
+			)
+			break loop
+		case <-sig:
+			log.Infof("action: signal_received | result: exiting | client_id: %v",
+				c.config.ID,
+			)
+			return
+		case <-time.After(c.config.LoopPeriod):
+		}
 	}
 
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
