@@ -16,4 +16,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -mod vendor -o bin/client github.com/7574-
 
 FROM busybox:latest
 COPY --from=builder /build/bin/client /client
+# Had it been a compressed tarball we could decompress it in one step with ADD
+COPY .data/dataset.zip .
+RUN unzip dataset.zip
 ENTRYPOINT ["/bin/sh"]

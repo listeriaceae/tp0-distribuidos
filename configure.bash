@@ -1,12 +1,7 @@
 #!/usr/bin/env bash
 
-first_names=( 'Lucas' 'Nahuel' 'Sofia' 'María Victoria' 'Jorge' )
-last_names=( 'Villanueva' 'Pérez' 'Ramos' 'Sanchez' 'Santos' )
-documents=( 40382057 33956394 38291054 25183928 30392849 )
-birthdates=( '1997-01-30' '1990-12-10' '1995-10-08' '1977-04-28' '1986-08-14' )
-numbers=( 9713 5784 1230 2744 7574 )
-nclients=${1:-5}
 name=$0
+nclients=${1:-5}
 
 is_nonnegative_int() {
     printf %d -"$1" >/dev/null 2>&1
@@ -37,7 +32,7 @@ services:
     volumes:
       - ./server/config.ini:/config.ini"
 
-for ((i = 0, n = 1; i < nclients; ++i, ++n))
+for ((n = 1; n <= nclients; ++n))
 do
     printf "
   client%d:
@@ -47,22 +42,12 @@ do
     environment:
       - CLI_AGENCY=%d
       - CLI_LOG_LEVEL=DEBUG
-      - NOMBRE=%s
-      - APELLIDO=%s
-      - DOCUMENTO=%s
-      - NACIMIENTO=%s
-      - NUMERO=%d
     networks:
       - testing_net
     depends_on:
       - server
     volumes:
-      - ./client/config.yaml:/config.yaml\n" $n $n $n \
-          "${first_names[$i]}" \
-          "${last_names[$i]}" \
-          "${documents[$i]}" \
-          "${birthdates[$i]}" \
-          "${numbers[$i]}"
+      - ./client/config.yaml:/config.yaml\n" $n $n $n
 done
 
 echo '
