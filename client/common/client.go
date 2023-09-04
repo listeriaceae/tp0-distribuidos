@@ -1,10 +1,9 @@
 package common
 
 import (
-	"bufio"
-	"fmt"
+	"bytes"
+	"io"
 	"net"
-	"time"
 	"os"
 
 	log "github.com/sirupsen/logrus"
@@ -12,10 +11,8 @@ import (
 
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
-	ID            string
+	Agency        int
 	ServerAddress string
-	LoopLapse     time.Duration
-	LoopPeriod    time.Duration
 }
 
 // Client Entity that encapsulates how
@@ -41,7 +38,7 @@ func (c *Client) createClientSocket() error {
 	if err != nil {
 		log.Fatalf(
 			"action: connect | result: fail | client_id: %v | error: %v",
-			c.config.ID,
+			c.config.Agency,
 			err,
 		)
 	}
@@ -49,57 +46,59 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-func (c *Client) communicateWithServer(msgID int) (string, error) {
-	// Create the connection the server in every loop iteration. Send an
+func (c *Client) SendBet(bet Bet) {
+	var buf bytes.Buffer
+
 	c.createClientSocket()
 	defer c.conn.Close()
 
-	// TODO: Modify the send to avoid short-write
-	fmt.Fprintf(
-		c.conn,
-		"[CLIENT %v] Message N°%v\n",
-		c.config.ID,
-		msgID,
-	)
+	// Ignore errors as writing to buf can't fail
+	bet.Marshal(&buf, c.config.Agency)
 
-	return bufio.NewReader(c.conn).ReadString('\n')
-}
-
-// StartClientLoop Send messages to the client until some time threshold is met
-func (c *Client) StartClientLoop(sig chan os.Signal) {
-loop:
-	// autoincremental msgID to identify every message sent
-	// Send messages if the loopLapse threshold has not been surpassed
-	for msgID, timeout := 1, time.After(c.config.LoopLapse); ; msgID++ {
-		msg, err := c.communicateWithServer(msgID)
-
-		if err != nil {
-			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			return
-		}
-		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
-			c.config.ID,
-			msg,
+	_, err := io.Copy(c.conn, &buf)
+	if err != nil {
+		log.Errorf("action: apuesta_enviada | result: fail | agency: %v | error: %v",
+			c.config.Agency,
+			err,
 		)
-
-		// Wait a time between sending one message and the next one
-		select {
-		case <-timeout:
-			log.Infof("action: timeout_detected | result: success | client_id: %v",
-				c.config.ID,
-			)
-			break loop
-		case <-sig:
-			log.Infof("action: signal_received | result: exiting | client_id: %v",
-				c.config.ID,
-			)
-			return
-		case <-time.After(c.config.LoopPeriod):
-		}
+		return
 	}
 
-	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+	result, err := io.ReadAll(c.conn)
+	if err != nil {
+		log.Errorf("action: apuesta_enviada | result: fail | agency: %v | error: %v",
+			c.config.Agency,
+			err,
+		)
+		return
+	}
+	log.Infof(
+		"action: apuesta_enviada | result: %s | dni: %v | numero: %v",
+		result,
+		bet.Document,
+		bet.Number,
+	)
+}
+
+func (c *Client) Start(sig chan os.Signal, bet Bet) {
+	done := make(chan bool)
+
+	log.Infof(
+		"action: enviar_apuesta | result: in_progress | dni: %v | numero: %v",
+		bet.Document,
+		bet.Number,
+	)
+
+	go func() {
+		c.SendBet(bet)
+		done <- true
+	}()
+
+	select {
+	case <-sig:
+		log.Infof("action: signal_received | result: exit")
+		c.conn.Close()
+		<-done
+	case <-done:
+	}
 }

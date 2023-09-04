@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -32,6 +32,18 @@ func InitConfig() (*viper.Viper, error) {
 	// env variables for the nested configurations
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
+	env_vars := map[string]string{
+		"first_name": "NOMBRE",
+		"last_name":  "APELLIDO",
+		"document":   "DOCUMENTO",
+		"birthdate":  "NACIMIENTO",
+		"number":     "NUMERO",
+	}
+
+	for key, replace := range env_vars {
+		v.BindEnv(key, replace)
+	}
+
 	// Try to read configuration from config file. If config file
 	// does not exists then ReadInConfig will fail but configuration
 	// can be loaded from the environment variables so we shouldn't
@@ -44,13 +56,18 @@ func InitConfig() (*viper.Viper, error) {
 		fmt.Println("Configuration could not be read from config file. Using env variables instead")
 	}
 
-	// Parse time.Duration variables and return an error if those variables cannot be parsed
-	if _, err := time.ParseDuration(v.GetString("loop.lapse")); err != nil {
-		return nil, errors.Wrap(err, "Could not parse CLI_LOOP_LAPSE env var as time.Duration.")
+	for key, env := range env_vars {
+		if !v.IsSet(key) {
+			return nil, fmt.Errorf("Missing environment variable: %s", env)
+		}
 	}
 
-	if _, err := time.ParseDuration(v.GetString("loop.period")); err != nil {
-		return nil, errors.Wrap(err, "Could not parse CLI_LOOP_PERIOD env var as time.Duration.")
+	if _, err := strconv.Atoi(v.GetString("agency")); err != nil {
+		return nil, errors.Wrap(err, "Could not parse CLI_AGENCY env var as int.")
+	}
+
+	if _, err := strconv.Atoi(v.GetString("number")); err != nil {
+		return nil, errors.Wrap(err, "Could not parse NUMERO env var as int.")
 	}
 
 	return v, nil
@@ -77,12 +94,15 @@ func InitLogger(logLevel string) error {
 // PrintConfig Print all the configuration parameters of the program.
 // For debugging purposes only
 func PrintConfig(v *viper.Viper) {
-	logrus.Infof("action: config | result: success | client_id: %s | server_address: %s | loop_lapse: %v | loop_period: %v | log_level: %s",
-		v.GetString("id"),
+	logrus.Debugf("action: config | result: success | agency: %d | server_address: %s | log_level: %s | first_name: %s | last_name: %s | document: %s | birthdate: %s | number: %d",
+		v.GetInt("agency"),
 		v.GetString("server.address"),
-		v.GetDuration("loop.lapse"),
-		v.GetDuration("loop.period"),
 		v.GetString("log.level"),
+		v.GetString("first_name"),
+		v.GetString("last_name"),
+		v.GetString("document"),
+		v.GetString("birthdate"),
+		v.GetInt("number"),
 	)
 }
 
@@ -100,15 +120,21 @@ func main() {
 	PrintConfig(v)
 
 	clientConfig := common.ClientConfig{
+		Agency:        v.GetInt("agency"),
 		ServerAddress: v.GetString("server.address"),
-		ID:            v.GetString("id"),
-		LoopLapse:     v.GetDuration("loop.lapse"),
-		LoopPeriod:    v.GetDuration("loop.period"),
+	}
+
+	bet := common.Bet{
+		FirstName: v.GetString("first_name"),
+		LastName:  v.GetString("last_name"),
+		Document:  v.GetString("document"),
+		Birthdate: v.GetString("birthdate"),
+		Number:    v.GetInt("number"),
 	}
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
 	client := common.NewClient(clientConfig)
-	client.StartClientLoop(sig)
+	client.Start(sig, bet)
 }

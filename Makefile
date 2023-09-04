@@ -17,7 +17,7 @@ build: deps
 
 # usage: `make configure NCLIENTS=<N>`
 configure:
-	./configure.sh $(NCLIENTS) > docker-compose-dev.yaml
+	./configure.bash $(NCLIENTS) > docker-compose-dev.yaml
 .PHONY: configure
 
 docker-image:

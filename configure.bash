@@ -1,7 +1,11 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
-n=1
-nclients=${1:-1}
+first_names=( 'Lucas' 'Nahuel' 'Sofia' 'María Victoria' 'Jorge' )
+last_names=( 'Villanueva' 'Pérez' 'Ramos' 'Sanchez' 'Santos' )
+documents=( 40382057 33956394 38291054 25183928 30392849 )
+birthdates=( '1997-01-30' '1990-12-10' '1995-10-08' '1977-04-28' '1986-08-14' )
+numbers=( 9713 5784 1230 2744 7574 )
+nclients=${1:-5}
 name=$0
 
 is_nonnegative_int() {
@@ -13,7 +17,7 @@ error() {
     exit
 }
 
-if ! is_nonnegative_int $nclients
+if ! is_nonnegative_int $nclients || [ $nclients -gt 5 ]
 then
     error "nclients must be a non-negative integer"
 fi
@@ -33,24 +37,32 @@ services:
     volumes:
       - ./server/config.ini:/config.ini"
 
-while [ $n -le $nclients ]
+for ((i = 0, n = 1; i < nclients; ++i, ++n))
 do
-    printf '
+    printf "
   client%d:
     container_name: client%d
     image: client:latest
     entrypoint: /client
     environment:
-      - CLI_ID=%d
+      - CLI_AGENCY=%d
       - CLI_LOG_LEVEL=DEBUG
+      - NOMBRE=%s
+      - APELLIDO=%s
+      - DOCUMENTO=%s
+      - NACIMIENTO=%s
+      - NUMERO=%d
     networks:
       - testing_net
     depends_on:
       - server
     volumes:
-      - ./client/config.yaml:/config.yaml\n' $n $n $n
-
-    n=$((n+1))
+      - ./client/config.yaml:/config.yaml\n" $n $n $n \
+          "${first_names[$i]}" \
+          "${last_names[$i]}" \
+          "${documents[$i]}" \
+          "${birthdates[$i]}" \
+          "${numbers[$i]}"
 done
 
 echo '

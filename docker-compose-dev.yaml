@@ -18,8 +18,13 @@ services:
     image: client:latest
     entrypoint: /client
     environment:
-      - CLI_ID=1
+      - CLI_AGENCY=1
       - CLI_LOG_LEVEL=DEBUG
+      - NOMBRE=Lucas
+      - APELLIDO=Villanueva
+      - DOCUMENTO=40382057
+      - NACIMIENTO=1997-01-30
+      - NUMERO=9713
     networks:
       - testing_net
     depends_on:
@@ -32,8 +37,70 @@ services:
     image: client:latest
     entrypoint: /client
     environment:
-      - CLI_ID=2
+      - CLI_AGENCY=2
       - CLI_LOG_LEVEL=DEBUG
+      - NOMBRE=Nahuel
+      - APELLIDO=Pérez
+      - DOCUMENTO=33956394
+      - NACIMIENTO=1990-12-10
+      - NUMERO=5784
+    networks:
+      - testing_net
+    depends_on:
+      - server
+    volumes:
+      - ./client/config.yaml:/config.yaml
+
+  client3:
+    container_name: client3
+    image: client:latest
+    entrypoint: /client
+    environment:
+      - CLI_AGENCY=3
+      - CLI_LOG_LEVEL=DEBUG
+      - NOMBRE=Sofia
+      - APELLIDO=Ramos
+      - DOCUMENTO=38291054
+      - NACIMIENTO=1995-10-08
+      - NUMERO=1230
+    networks:
+      - testing_net
+    depends_on:
+      - server
+    volumes:
+      - ./client/config.yaml:/config.yaml
+
+  client4:
+    container_name: client4
+    image: client:latest
+    entrypoint: /client
+    environment:
+      - CLI_AGENCY=4
+      - CLI_LOG_LEVEL=DEBUG
+      - NOMBRE=María Victoria
+      - APELLIDO=Sanchez
+      - DOCUMENTO=25183928
+      - NACIMIENTO=1977-04-28
+      - NUMERO=2744
+    networks:
+      - testing_net
+    depends_on:
+      - server
+    volumes:
+      - ./client/config.yaml:/config.yaml
+
+  client5:
+    container_name: client5
+    image: client:latest
+    entrypoint: /client
+    environment:
+      - CLI_AGENCY=5
+      - CLI_LOG_LEVEL=DEBUG
+      - NOMBRE=Jorge
+      - APELLIDO=Santos
+      - DOCUMENTO=30392849
+      - NACIMIENTO=1986-08-14
+      - NUMERO=7574
     networks:
       - testing_net
     depends_on:
