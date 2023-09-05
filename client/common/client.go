@@ -66,13 +66,13 @@ func (c *Client) sendBatch(r io.Reader, length int) error {
 	return err
 }
 
-func (c *Client) SendBets(r *csv.Reader) {
+func (c *Client) SendBets(r *csv.Reader) error {
 	var buf bytes.Buffer
 
 	for i := 0; ; i++ {
 		if i == c.config.BatchSize {
-			if c.sendBatch(&buf, buf.Len()) != nil {
-				return
+			if err := c.sendBatch(&buf, buf.Len()); err != nil {
+				return err
 			}
 			i = 0
 			buf.Reset()
@@ -88,7 +88,7 @@ func (c *Client) SendBets(r *csv.Reader) {
 				c.config.Agency,
 				err,
 			)
-			return
+			return err
 		}
 
 		// Ignore errors as writing to buf can't fail
@@ -96,17 +96,22 @@ func (c *Client) SendBets(r *csv.Reader) {
 	}
 
 	if buf.Len() > 0 {
-		if c.sendBatch(&buf, buf.Len()) != nil {
-			return
+		if err := c.sendBatch(&buf, buf.Len()); err != nil {
+			return err
 		}
 	}
 	log.Infof("action: apuestas_enviadas | result: complete | agency: %v",
 		c.config.Agency,
 	)
+	return nil
+}
+
+func (c *Client) RequestWinners() error {
+	return nil
 }
 
 func (c *Client) Start(sig chan os.Signal, r io.Reader) {
-	done := make(chan bool)
+	done := make(chan error)
 
 	c.createClientSocket()
 
@@ -116,8 +121,7 @@ func (c *Client) Start(sig chan os.Signal, r io.Reader) {
 	)
 
 	go func() {
-		c.SendBets(csv.NewReader(r))
-		done <- true
+		done <- c.SendBets(csv.NewReader(r))
 	}()
 
 	select {
@@ -126,7 +130,26 @@ func (c *Client) Start(sig chan os.Signal, r io.Reader) {
 			"action: signal_received | result: exit | agency: %v",
 			c.config.Agency,
 		)
+		c.conn.Close()
+		<-done
+		return
+	case err := <-done:
+		if err != nil {
+			c.conn.Close()
+			return
+		}
+	}
 
+	go func() {
+		done <- c.RequestWinners()
+	}()
+
+	select {
+	case <-sig:
+		log.Infof(
+			"action: signal_received | result: exit | agency: %v",
+			c.config.Agency,
+		)
 		c.conn.Close()
 		<-done
 	case <-done:
