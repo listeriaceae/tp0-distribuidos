@@ -1,6 +1,7 @@
 import csv
 import datetime
 import time
+import logging
 
 
 """ Bets storage location. """
@@ -121,4 +122,5 @@ class SignalException(Exception):
 
 
 def handler(signum, frame):
+    logging.info(f'action: exit_requested | result: success | closing listener')
     raise SignalException()

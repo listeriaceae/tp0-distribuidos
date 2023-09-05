@@ -160,7 +160,7 @@ func (c *Client) Start(sig chan os.Signal, r io.Reader) {
 			)
 		} else {
 			log.Infof(
-				"action: consulta_ganadores | result: success | cant_ganadores: %s",
+				"action: consulta_ganadores | result: success | cant_ganadores: %d",
 				cant,
 			)
 		}
