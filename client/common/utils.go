@@ -3,33 +3,18 @@ package common
 import (
 	"encoding/binary"
 	"io"
+	"net"
 	"strconv"
 )
 
-// A lottery bet registry.
-type Bet struct {
-	FirstName string
-	LastName  string
-	Document  string
-	Birthdate string
-	Number    int
-}
+func BetMarshal(w io.Writer, agency int, record []string) error {
+	data := []string{strconv.Itoa(agency)}
 
-func (b *Bet) Marshal(w io.Writer, agency int) error {
-	data := [...]string{
-		strconv.Itoa(agency),
-		b.FirstName,
-		b.LastName,
-		b.Document,
-		b.Birthdate,
-		strconv.Itoa(b.Number),
-	}
-
-	const header_size = len(data) * 2
-	offset := uint16(header_size)
+	data = append(data, record...)
+	offset := uint16(len(data) * 2)
 
 	// Consecutive offsets indicate the start and end of attributes.
-	// There's an implicit initial offset of `header_size`.
+	// There's an implicit initial offset of `header size`.
 	for _, v := range data {
 		offset += uint16(len(v))
 		if err := binary.Write(w, binary.BigEndian, offset); err != nil {
@@ -45,4 +30,22 @@ func (b *Bet) Marshal(w io.Writer, agency int) error {
 	}
 
 	return nil
+}
+
+func sendBatch(conn net.Conn, r io.Reader, length int) ([]byte, error) {
+	var result [8]byte
+
+	// The first 2 bytes of the message encode its length in big endian
+	err := binary.Write(conn, binary.BigEndian, uint16(length))
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = io.Copy(conn, r)
+	if err != nil {
+		return nil, err
+	}
+
+	n, err := conn.Read(result[:])
+	return result[:n], err
 }

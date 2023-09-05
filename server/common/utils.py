@@ -51,7 +51,7 @@ class Bet:
         birthdate  = stream[document_end   :  birthdate_end].decode('utf-8')
         number     = stream[birthdate_end  :     number_end].decode('utf-8')
 
-        return cls(agency, first_name, last_name, document, birthdate, number), stream[number_end:]
+        return cls(agency, first_name, last_name, document, birthdate, number), number_end
 
 """ Checks whether a bet won the prize or not. """
 def has_won(bet: Bet) -> bool:
@@ -78,6 +78,22 @@ def load_bets() -> list[Bet]:
         for row in reader:
             yield Bet(row[0], row[1], row[2], row[3], row[4], row[5])
 
+
+def read_batch(fn, reader, size):
+    """
+    fn(reader, size) must read up to size bytes from the reader
+    call fn(writer, block) until we read size bytes or an error occurs.
+    return the read data.
+    """
+    buffer = b""
+    while size > 0:
+        block = fn(reader, size)
+        if block == b"":
+            break
+        buffer += block
+        size -= len(block)
+
+    return buffer
 
 def try_write(fn, writer, block, max_remaining=0):
     """

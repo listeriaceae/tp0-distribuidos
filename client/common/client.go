@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"encoding/csv"
 	"io"
 	"net"
 	"os"
@@ -12,6 +13,7 @@ import (
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
 	Agency        int
+	BatchSize     int
 	ServerAddress string
 }
 
@@ -46,59 +48,88 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-func (c *Client) SendBet(bet Bet) {
+func (c *Client) sendBatch(r io.Reader, length int) error {
+	result, err := sendBatch(c.conn, r, length)
+	if err != nil {
+		log.Errorf(
+			"action: apuestas_enviadas | result: fail | agency: %v | error: %v",
+			c.config.Agency,
+			err,
+		)
+	} else {
+		log.Infof(
+			"action: apuestas_enviadas | result: %s | agency: %v",
+			result,
+			c.config.Agency,
+		)
+	}
+	return err
+}
+
+func (c *Client) SendBets(r *csv.Reader) {
 	var buf bytes.Buffer
 
-	c.createClientSocket()
-	defer c.conn.Close()
+	for i := 0; ; i++ {
+		if i == c.config.BatchSize {
+			if c.sendBatch(&buf, buf.Len()) != nil {
+				return
+			}
+			i = 0
+			buf.Reset()
+		}
 
-	// Ignore errors as writing to buf can't fail
-	bet.Marshal(&buf, c.config.Agency)
+		record, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Errorf(
+				"action: apuestas_enviadas | result: fail | agency: %v | error: %v",
+				c.config.Agency,
+				err,
+			)
+			return
+		}
 
-	_, err := io.Copy(c.conn, &buf)
-	if err != nil {
-		log.Errorf("action: apuesta_enviada | result: fail | agency: %v | error: %v",
-			c.config.Agency,
-			err,
-		)
-		return
+		// Ignore errors as writing to buf can't fail
+		BetMarshal(&buf, c.config.Agency, record)
 	}
 
-	result, err := io.ReadAll(c.conn)
-	if err != nil {
-		log.Errorf("action: apuesta_enviada | result: fail | agency: %v | error: %v",
-			c.config.Agency,
-			err,
-		)
-		return
+	if buf.Len() > 0 {
+		if c.sendBatch(&buf, buf.Len()) != nil {
+			return
+		}
 	}
-	log.Infof(
-		"action: apuesta_enviada | result: %s | dni: %v | numero: %v",
-		result,
-		bet.Document,
-		bet.Number,
+	log.Infof("action: apuestas_enviadas | result: complete | agency: %v",
+		c.config.Agency,
 	)
 }
 
-func (c *Client) Start(sig chan os.Signal, bet Bet) {
+func (c *Client) Start(sig chan os.Signal, r io.Reader) {
 	done := make(chan bool)
 
+	c.createClientSocket()
+
 	log.Infof(
-		"action: enviar_apuesta | result: in_progress | dni: %v | numero: %v",
-		bet.Document,
-		bet.Number,
+		"action: enviar_apuestas | result: in_progress | agency: %v",
+		c.config.Agency,
 	)
 
 	go func() {
-		c.SendBet(bet)
+		c.SendBets(csv.NewReader(r))
 		done <- true
 	}()
 
 	select {
 	case <-sig:
-		log.Infof("action: signal_received | result: exit")
+		log.Infof(
+			"action: signal_received | result: exit | agency: %v",
+			c.config.Agency,
+		)
+
 		c.conn.Close()
 		<-done
 	case <-done:
+		c.conn.Close()
 	}
 }

@@ -1,6 +1,5 @@
 import socket
 import logging
-from functools import partial
 
 import common.utils as utils
 
@@ -39,29 +38,36 @@ class Server:
 
     def __handle_client_connection(self, client_sock):
         """
-        Receive a Bet from an agency and store it
+        Receive batches of Bets from an agency and store them accordingly
         """
         send = lambda writer, block: writer.send(block)
+        recv = lambda reader, n: reader.recv(n)
         try:
-            buffer = b""
-            for block in iter(partial(client_sock.recv, 1024), b""):
-                buffer += block
-                if len(buffer) < utils.HEADER_SIZE:
-                    continue
-                try:
-                    bet, _ = utils.Bet.from_bytes(buffer)
-                except PartialDataError:
-                    pass
-                else:
-                    utils.store_bets((bet,))
-                    break
+            while (buffer := client_sock.recv(4096)) != b"":
+                if len(buffer) < 2:
+                    raise utils.PartialDataError
+                batch_size = int.from_bytes(buffer[:2], "big")
+                consumed = 2
+                buffer += utils.read_batch(recv, client_sock, batch_size - (len(buffer) - consumed))
 
-            msg = b"success"
-            logging.info(f"action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}")
-            if utils.try_write(send, client_sock, msg) != len(msg):
-                logging.error(f"action: send_response | result: fail | error: short_write")
-        except OSError as e:
+                if len(buffer) != batch_size + consumed:
+                    raise utils.PartialDataError
+
+                bets = []
+                while consumed < len(buffer):
+                    bet, n = utils.Bet.from_bytes(buffer[consumed:])
+                    bets.append(bet)
+                    consumed += n
+
+                utils.store_bets(bets)
+
+                msg = b"success"
+                logging.info(f"action: apuesta_almacenada | result: success")
+                if utils.try_write(send, client_sock, msg) != len(msg):
+                    logging.error(f"action: send_response | result: fail | error: short_write")
+        except (OSError, PartialDataError) as e:
             logging.error(f"action: receive_message | result: fail | error: {e}")
+
 
     def __accept_new_connection(self):
         """

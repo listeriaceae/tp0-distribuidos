@@ -8,7 +8,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -32,17 +31,9 @@ func InitConfig() (*viper.Viper, error) {
 	// env variables for the nested configurations
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	env_vars := map[string]string{
-		"first_name": "NOMBRE",
-		"last_name":  "APELLIDO",
-		"document":   "DOCUMENTO",
-		"birthdate":  "NACIMIENTO",
-		"number":     "NUMERO",
-	}
-
-	for key, replace := range env_vars {
-		v.BindEnv(key, replace)
-	}
+	// Allow overriding the default batch size of 100
+	// via env var or config file
+	v.SetDefault("batchSize", 100)
 
 	// Try to read configuration from config file. If config file
 	// does not exists then ReadInConfig will fail but configuration
@@ -56,18 +47,8 @@ func InitConfig() (*viper.Viper, error) {
 		fmt.Println("Configuration could not be read from config file. Using env variables instead")
 	}
 
-	for key, env := range env_vars {
-		if !v.IsSet(key) {
-			return nil, fmt.Errorf("Missing environment variable: %s", env)
-		}
-	}
-
 	if _, err := strconv.Atoi(v.GetString("agency")); err != nil {
-		return nil, errors.Wrap(err, "Could not parse CLI_AGENCY env var as int.")
-	}
-
-	if _, err := strconv.Atoi(v.GetString("number")); err != nil {
-		return nil, errors.Wrap(err, "Could not parse NUMERO env var as int.")
+		return nil, fmt.Errorf("Could not parse CLI_AGENCY env var as int: %w", err)
 	}
 
 	return v, nil
@@ -94,15 +75,11 @@ func InitLogger(logLevel string) error {
 // PrintConfig Print all the configuration parameters of the program.
 // For debugging purposes only
 func PrintConfig(v *viper.Viper) {
-	logrus.Debugf("action: config | result: success | agency: %d | server_address: %s | log_level: %s | first_name: %s | last_name: %s | document: %s | birthdate: %s | number: %d",
+	logrus.Debugf("action: config | result: success | agency: %d | batch_size: %d | server_address: %s | log_level: %s",
 		v.GetInt("agency"),
+		v.GetInt("batchSize"),
 		v.GetString("server.address"),
 		v.GetString("log.level"),
-		v.GetString("first_name"),
-		v.GetString("last_name"),
-		v.GetString("document"),
-		v.GetString("birthdate"),
-		v.GetInt("number"),
 	)
 }
 
@@ -121,20 +98,19 @@ func main() {
 
 	clientConfig := common.ClientConfig{
 		Agency:        v.GetInt("agency"),
+		BatchSize:     v.GetInt("batchSize"),
 		ServerAddress: v.GetString("server.address"),
 	}
 
-	bet := common.Bet{
-		FirstName: v.GetString("first_name"),
-		LastName:  v.GetString("last_name"),
-		Document:  v.GetString("document"),
-		Birthdate: v.GetString("birthdate"),
-		Number:    v.GetInt("number"),
+	file, err := os.Open(fmt.Sprintf("agency-%d.csv", clientConfig.Agency))
+	if err != nil {
+		log.Fatal(err)
 	}
+	defer file.Close()
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
 	client := common.NewClient(clientConfig)
-	client.Start(sig, bet)
+	client.Start(sig, file)
 }
