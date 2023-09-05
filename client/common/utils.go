@@ -59,3 +59,13 @@ func RequestWinners(w io.Writer, agency int) error {
 	return err
 
 }
+
+func RequestWinners(w io.Writer, agency int) error {
+	var buf [4]byte
+
+	// binary.BigEndian.PutUint16(buf[:], uint16(0))
+	binary.BigEndian.PutUint16(buf[2:], uint16(agency))
+	_, err := w.Write(buf[:])
+	return err
+
+}
