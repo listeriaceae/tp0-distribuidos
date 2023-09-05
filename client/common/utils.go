@@ -49,3 +49,13 @@ func sendBatch(conn net.Conn, r io.Reader, length int) ([]byte, error) {
 	_, err = io.ReadFull(conn, result[:])
 	return result[:], err
 }
+
+func RequestWinners(w io.Writer, agency int) error {
+	var buf [4]byte
+
+	// binary.BigEndian.PutUint16(buf[:], uint16(0))
+	binary.BigEndian.PutUint16(buf[2:], uint16(agency))
+	_, err := w.Write(buf[:])
+	return err
+
+}

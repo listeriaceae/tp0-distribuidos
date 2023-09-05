@@ -1,6 +1,7 @@
 package common
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/csv"
 	"io"
@@ -106,8 +107,18 @@ func (c *Client) SendBets(r *csv.Reader) error {
 	return nil
 }
 
-func (c *Client) RequestWinners() error {
-	return nil
+func (c *Client) RequestWinners() (int, error) {
+	err := RequestWinners(c.conn, c.config.Agency)
+	if err != nil {
+		return 0, err
+	}
+
+	cant_ganadores := 0
+	scanner := bufio.NewScanner(c.conn)
+	for ; scanner.Scan(); cant_ganadores++ {
+	}
+
+	return cant_ganadores, scanner.Err()
 }
 
 func (c *Client) Start(sig chan os.Signal, r io.Reader) {
@@ -141,7 +152,19 @@ func (c *Client) Start(sig chan os.Signal, r io.Reader) {
 	}
 
 	go func() {
-		done <- c.RequestWinners()
+		cant, err := c.RequestWinners()
+		if err != nil {
+			log.Errorf(
+				"action: consulta_ganadores | result: fail | error: %v",
+				err,
+			)
+		} else {
+			log.Infof(
+				"action: consulta_ganadores | result: success | cant_ganadores: %s",
+				cant,
+			)
+		}
+		done <- err
 	}()
 
 	select {
