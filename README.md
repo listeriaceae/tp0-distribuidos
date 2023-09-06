@@ -37,3 +37,17 @@ Concatenación de los atributos (sin _padding_), podemos saber donde empieza y
 termina cada atributo viendo donde termina el atributo anterior, si es el
 primero empieza con un _offset_ de 12 bytes (el tamaño del _header_).  
 El final del atributo `number` coincide con el final del mensaje.
+
+## Parte 3: Repaso de Concurrencia
+
+## Mecanismos de sincronización
+Se utiliza _multithreading_, con un hilo por cliente.  
+Se utiliza un _Lock_ para sincronizar las llamadas a `store_bets(...)` y una
+_Barrier_ para sincronizar los hilos que manejan las conexiones a los clientes
+cuando estos terminan de enviar apuestas. Antes de desbloquear la barrera uno
+de los hilos llama a `filter_winners(...)`, esta función carga a los ganadores
+en una lista, la cual estos hilos utilizan para comunicar a cada agencia sus
+ganadores.  
+La llamada a `load_bets(...)` no requiere un lock porque solo se cargan una vez
+que no hay más apuestas (no hay más escrituras). Aún si todos los hilos leyeran
+el archivo en paralelo no sería un problema.
