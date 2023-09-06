@@ -17,6 +17,13 @@ Las secciones de repaso del trabajo práctico plantean un caso de uso denominado
 
 ## Protocolo para envío de apuestas
 
+### Batch Header
+* 2 bytes (_big endian_) indicando el tamaño del _data_segment_ del batch en
+  bytes.
+
+### Batch Data
+Concatenación de apuestas (header + data):
+
 ### Header (12 bytes)
 * 2 bytes (_big endian_) indicando el final del atributo `agency`
 * 2 bytes (_big endian_) indicando el final del atributo `first_name`
