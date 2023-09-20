@@ -33,7 +33,7 @@ func BetMarshal(w io.Writer, agency int, record []string) error {
 }
 
 func sendBatch(conn net.Conn, r io.Reader, length int) ([]byte, error) {
-	var result [8]byte
+	var result [7]byte
 
 	// The first 2 bytes of the message encode its length in big endian
 	err := binary.Write(conn, binary.BigEndian, uint16(length))
@@ -46,6 +46,12 @@ func sendBatch(conn net.Conn, r io.Reader, length int) ([]byte, error) {
 		return nil, err
 	}
 
-	n, err := conn.Read(result[:])
-	return result[:n], err
+	for n := 0; n < len("success"); {
+		m, err := conn.Read(result[n:])
+		if err != nil {
+			return nil, err
+		}
+		n += m
+	}
+	return result[:len("success")], err
 }
