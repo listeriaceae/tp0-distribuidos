@@ -46,12 +46,6 @@ func sendBatch(conn net.Conn, r io.Reader, length int) ([]byte, error) {
 		return nil, err
 	}
 
-	for n := 0; n < len("success"); {
-		m, err := conn.Read(result[n:])
-		if err != nil {
-			return nil, err
-		}
-		n += m
-	}
-	return result[:len("success")], err
+	_, err = io.ReadFull(conn, result[:])
+	return result[:], err
 }
